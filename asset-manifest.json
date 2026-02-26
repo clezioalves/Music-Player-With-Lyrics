@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/nova-coletanea-player/static/css/main.77d3637f.css",
+    "main.js": "/nova-coletanea-player/static/js/main.ebd1b2ed.js",
+    "static/js/787.4699b709.chunk.js": "/nova-coletanea-player/static/js/787.4699b709.chunk.js",
+    "index.html": "/nova-coletanea-player/index.html",
+    "main.77d3637f.css.map": "/nova-coletanea-player/static/css/main.77d3637f.css.map",
+    "main.ebd1b2ed.js.map": "/nova-coletanea-player/static/js/main.ebd1b2ed.js.map",
+    "787.4699b709.chunk.js.map": "/nova-coletanea-player/static/js/787.4699b709.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.77d3637f.css",
+    "static/js/main.ebd1b2ed.js"
+  ]
+}
