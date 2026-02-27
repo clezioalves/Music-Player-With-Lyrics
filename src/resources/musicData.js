@@ -38,17 +38,28 @@ export const loadMusicDB = async () => {
   const query = encodeURIComponent(`'${GOOGLE_DRIVE_FOLDER_ID}' in parents and trashed = false`);
   const fields = encodeURIComponent("files(id,name,mimeType)");
 
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&orderBy=name&key=${apiKey}`
-  );
+  const files = [];
+  let nextPageToken = "";
 
-  if (!response.ok) {
-    throw new Error("Não foi possível carregar os arquivos de áudio do Google Drive.");
-  }
+  do {
+    const pageTokenParam = nextPageToken
+      ? `&pageToken=${encodeURIComponent(nextPageToken)}`
+      : "";
 
-  const data = await response.json();
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields},nextPageToken&orderBy=name&pageSize=1000${pageTokenParam}&key=${apiKey}`
+    );
 
-  return (data.files || [])
+    if (!response.ok) {
+      throw new Error("Não foi possível carregar os arquivos de áudio do Google Drive.");
+    }
+
+    const data = await response.json();
+    files.push(...(data.files || []));
+    nextPageToken = data.nextPageToken || "";
+  } while (nextPageToken);
+
+  return files
     .filter((file) => file.mimeType && file.mimeType.startsWith("audio/"))
     .map((file, index) => {
       const slug = createSlug(file.name);
