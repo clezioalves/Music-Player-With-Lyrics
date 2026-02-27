@@ -21,8 +21,10 @@ const createSlug = (fileName) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-const buildStreamUrl = (fileId) =>
-  `https://drive.google.com/uc?export=download&id=${fileId}`;
+const buildUcUrl = (fileId) => `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+const buildAltMediaUrl = (fileId, apiKey) =>
+  `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`;
 
 export const loadMusicDB = async () => {
   const apiKey = process.env.REACT_APP_GOOGLE_API_KEY;
@@ -47,7 +49,7 @@ export const loadMusicDB = async () => {
   const data = await response.json();
 
   return (data.files || [])
-    .filter((file) => file.mimeType === AUDIO_MIME_TYPE)
+    .filter((file) => file.mimeType && file.mimeType.startsWith("audio/"))
     .map((file, index) => {
       const slug = createSlug(file.name);
       const metadata = metadataBySlug[slug] || {};
@@ -57,7 +59,10 @@ export const loadMusicDB = async () => {
         title: metadata.title || file.name.replace(/\.[^/.]+$/, ""),
         artist: metadata.artist || "Artista desconhecido",
         album: metadata.album || "Google Drive",
-        src: buildStreamUrl(file.id),
+        // Primary src: drive v3 alt=media (returns raw bytes with correct content-type)
+        src: buildAltMediaUrl(file.id, apiKey),
+        // Fallback src (older uc?export=download style)
+        srcAlt: buildUcUrl(file.id),
         art: metadata.art || "https://via.placeholder.com/300x300?text=Album+Art",
         lyrics: lyricsData[slug] || [],
         order: index

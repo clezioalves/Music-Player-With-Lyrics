@@ -21,6 +21,7 @@ const MusicPlayer = (props) => {
     const fetchSongs = async () => {
       try {
         const driveSongs = await loadMusicDB();
+        console.log('driveSongs', driveSongs);
         setSongs(driveSongs);
       } catch (error) {
         setLoadError(error.message);
@@ -43,7 +44,25 @@ const MusicPlayer = (props) => {
       setCurrentSongIndex(nextIndex);
       setCurrentTime(0);
       audioRef.current.pause();
-      audioRef.current.src = songs[nextIndex].src;
+      // set primary src and prepare an error fallback to srcAlt
+      const primarySrc = songs[nextIndex].src;
+      const fallbackSrc = songs[nextIndex].srcAlt;
+      audioRef.current.src = primarySrc;
+      audioRef.current.dataset.triedAlt = "false";
+      audioRef.current.onerror = () => {
+        // try fallback once
+        if (fallbackSrc && audioRef.current.dataset.triedAlt !== "true") {
+          audioRef.current.dataset.triedAlt = "true";
+          audioRef.current.src = fallbackSrc;
+          audioRef.current.load();
+          // attempt to play, ignore promise rejection
+          audioRef.current.play().catch(() => {});
+          return;
+        }
+        setLoadingTrack(false);
+        setIsPlaying(false);
+        setLoadError("Não foi possível carregar a fonte de áudio.");
+      };
       audioRef.current.load();
       setLoadingTrack(true);
 
@@ -56,6 +75,33 @@ const MusicPlayer = (props) => {
     },
     [songs]
   );
+
+  // setup onerror fallback for the currently selected song (covers initial render)
+  useEffect(() => {
+    if (!audioRef.current || !currentSong) return;
+
+    const fallbackSrc = currentSong.srcAlt;
+    audioRef.current.dataset.triedAlt = "false";
+    audioRef.current.onerror = () => {
+      if (fallbackSrc && audioRef.current.dataset.triedAlt !== "true") {
+        audioRef.current.dataset.triedAlt = "true";
+        audioRef.current.src = fallbackSrc;
+        audioRef.current.load();
+        audioRef.current.play().catch(() => {});
+        return;
+      }
+      setLoadingTrack(false);
+      setIsPlaying(false);
+      setLoadError("Não foi possível carregar a fonte de áudio.");
+    };
+
+    // cleanup
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.onerror = null;
+      }
+    };
+  }, [currentSong]);
 
   const togglePlay = () => {
     if (!audioRef.current || songs.length === 0) {
