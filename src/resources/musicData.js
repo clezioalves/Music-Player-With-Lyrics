@@ -1,7 +1,6 @@
 import lyricsData from "./lyricsData.json";
 
 const GOOGLE_DRIVE_FOLDER_ID = "1dTuzWuaoVrPAKVocEq5MrOgsTQvWNZme";
-const AUDIO_MIME_TYPE = "audio/mpeg";
 
 const metadataBySlug = {
   "a-sombra-de-tuas-palavras": {
