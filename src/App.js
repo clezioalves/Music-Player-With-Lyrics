@@ -18,7 +18,7 @@ function App() {
         </div>
         <div className="section-right">
           <Lyrics
-            trackId={dataForLyrics.trackId}
+            lyrics={dataForLyrics.lyrics}
             currentTime={dataForLyrics.currentTime}
           />
         </div>
