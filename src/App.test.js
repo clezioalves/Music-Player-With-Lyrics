@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen } from "@testing-library/react";
+import App from "./App";
 
-test('renders learn react link', () => {
+test("renderiza o player", async () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  const message = await screen.findByText(/REACT_APP_GOOGLE_API_KEY|Carregando músicas do Google Drive/i);
+  expect(message).toBeInTheDocument();
 });

@@ -29,3 +29,18 @@ ReactJS: The core framework for building the music player's user interface.
 HTML/CSS: For structuring and styling the player.
 
 JavaScript: To handle music playback and real-time lyrics synchronization.
+
+
+# Configuração do Google Drive
+
+As músicas agora são carregadas de uma pasta pública do Google Drive usando a API do Drive.
+
+1. Crie uma API key no Google Cloud com a API do Google Drive habilitada.
+2. Crie um arquivo `.env` na raiz do projeto com:
+
+```
+REACT_APP_GOOGLE_API_KEY=sua_chave_aqui
+```
+
+A pasta utilizada está fixa no código com o id `1dTuzWuaoVrPAKVocEq5MrOgsTQvWNZme`.
+As letras continuam sendo lidas de JSON (`src/resources/lyricsData.json`) e associadas ao nome do arquivo da música.

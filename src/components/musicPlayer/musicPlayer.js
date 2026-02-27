@@ -1,89 +1,128 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./musicPlayer.css";
 import "./progressBar.css";
 import { IconContext } from "react-icons";
 import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
 import { AiFillPlayCircle, AiFillPauseCircle } from "react-icons/ai";
-import { musicDB } from "../../resources/musicData";
+import { loadMusicDB } from "../../resources/musicData";
+
 const MusicPlayer = (props) => {
+  const [songs, setSongs] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loadingTrack, setLoadingTrack] = useState(false);
+  const [loadingLibrary, setLoadingLibrary] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const audioRef = useRef(null);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
+  useEffect(() => {
+    const fetchSongs = async () => {
+      try {
+        const driveSongs = await loadMusicDB();
+        setSongs(driveSongs);
+      } catch (error) {
+        setLoadError(error.message);
+      } finally {
+        setLoadingLibrary(false);
+      }
+    };
+
+    fetchSongs();
+  }, []);
+
+  const currentSong = songs[currentSongIndex];
+
+  const setTrackAndPlay = useCallback(
+    (nextIndex) => {
+      if (!audioRef.current || songs.length === 0) {
+        return;
+      }
+
+      setCurrentSongIndex(nextIndex);
+      setCurrentTime(0);
+      audioRef.current.pause();
+      audioRef.current.src = songs[nextIndex].src;
+      audioRef.current.load();
+      setLoadingTrack(true);
+
+      audioRef.current.oncanplaythrough = () => {
+        audioRef.current.play();
+        audioRef.current.oncanplaythrough = null;
+        setLoadingTrack(false);
+        setIsPlaying(true);
+      };
+    },
+    [songs]
+  );
+
   const togglePlay = () => {
+    if (!audioRef.current || songs.length === 0) {
+      return;
+    }
+
     if (isPlaying) {
       audioRef.current.pause();
     } else {
       audioRef.current.play();
     }
+
     setIsPlaying(!isPlaying);
   };
-  const playNext = () => {
-    const nextIndex = (currentSongIndex + 1) % musicDB.length;
-    setCurrentSongIndex(nextIndex);
-    audioRef.current.pause();
 
-    audioRef.current.src = musicDB[nextIndex].src;
-    audioRef.current.load();
+  const playNext = useCallback(() => {
+    if (songs.length === 0) {
+      return;
+    }
 
-    audioRef.current.oncanplaythrough = () => {
-      audioRef.current.play();
-      audioRef.current.oncanplaythrough = null;
-      setLoading(false); // Set loading to false when the audio is ready
-    };
-
-    setLoading(true); // Set loading to true while the new audio is loading
-  };
+    const nextIndex = (currentSongIndex + 1) % songs.length;
+    setTrackAndPlay(nextIndex);
+  }, [currentSongIndex, setTrackAndPlay, songs.length]);
 
   const playPrev = () => {
-    const prevIndex = (currentSongIndex - 1 + musicDB.length) % musicDB.length;
-    setCurrentSongIndex(prevIndex);
-    audioRef.current.pause();
+    if (songs.length === 0) {
+      return;
+    }
 
-    audioRef.current.src = musicDB[prevIndex].src;
-    audioRef.current.load();
-
-    audioRef.current.oncanplaythrough = () => {
-      audioRef.current.play();
-      audioRef.current.oncanplaythrough = null;
-      setLoading(false); // Set loading to false when the audio is ready
-    };
-
-    setLoading(true); // Set loading to true while the new audio is loading
+    const prevIndex = (currentSongIndex - 1 + songs.length) % songs.length;
+    setTrackAndPlay(prevIndex);
   };
-  //USE EFFECT FOR SENDING CURRENT TIME TO PARENT COMPONENT FOR LYRICS
+
   useEffect(() => {
+    if (!currentSong) {
+      return;
+    }
+
     const intervalId = setInterval(() => {
-      // Call the callback function in the parent component with the data
       props.getDataForLyrics({
-        trackId: musicDB[currentSongIndex].id,
-        currentTime: currentTime,
+        trackId: currentSong.id,
+        currentTime,
+        lyrics: currentSong.lyrics
       });
-    }, 500); // Update data every 1 second
+    }, 500);
 
-    // Cleanup the interval when the component unmounts
     return () => clearInterval(intervalId);
-  }, [props]);
-  //USE EFFECT FOR TRACK SEEKING
-  useEffect(() => {
-    audioRef.current.addEventListener("timeupdate", handleTimeUpdate);
-    audioRef.current.addEventListener("loadedmetadata", handleLoadedMetadata);
+  }, [currentSong, currentTime, props]);
 
-    // Add an event listener for the 'ended' event to autoplay the next song
-    audioRef.current.addEventListener("ended", playNext);
+  useEffect(() => {
+    const audioElement = audioRef.current;
+
+    if (!audioElement || songs.length === 0) {
+      return;
+    }
+
+    audioElement.addEventListener("timeupdate", handleTimeUpdate);
+    audioElement.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audioElement.addEventListener("ended", playNext);
 
     return () => {
-      audioRef.current.removeEventListener("timeupdate", handleTimeUpdate);
-      audioRef.current.removeEventListener(
-        "loadedmetadata",
-        handleLoadedMetadata
-      );
-      audioRef.current.removeEventListener("ended", playNext);
+      audioElement.removeEventListener("timeupdate", handleTimeUpdate);
+      audioElement.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audioElement.removeEventListener("ended", playNext);
     };
-  }, [currentSongIndex, playNext, props]);
+  }, [playNext, songs.length]);
+
   const handleTimeUpdate = () => {
     setCurrentTime(audioRef.current.currentTime);
   };
@@ -99,40 +138,47 @@ const MusicPlayer = (props) => {
   };
 
   const handleSeek = (newTime) => {
+    if (!audioRef.current) {
+      return;
+    }
+
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
   };
+
   const progress = (currentTime / duration) * 100 || 0;
+
+  if (loadingLibrary) {
+    return <div className="music-player">Carregando músicas do Google Drive...</div>;
+  }
+
+  if (loadError) {
+    return <div className="music-player">{loadError}</div>;
+  }
+
+  if (!currentSong) {
+    return <div className="music-player">Nenhuma música encontrada na pasta.</div>;
+  }
+
   return (
     <div className="music-player">
       <audio
         ref={audioRef}
-        src={musicDB[currentSongIndex].src}
+        src={currentSong.src}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
       ></audio>
       <div className="component">
-        <h2 className="playerTitle">
-          {loading && currentSongIndex !== 0
-            ? "Loading..."
-            : musicDB[currentSongIndex].album}
-        </h2>
+        <h2 className="playerTitle">{loadingTrack ? "Loading..." : currentSong.album}</h2>
         <div className="musicCover">
-          <img className="albumArtImage" src={musicDB[currentSongIndex].art} />
+          <img className="albumArtImage" src={currentSong.art} alt={currentSong.title} />
         </div>
         <div className="progress-container">
           <div
             className="progress"
-            onClick={(e) =>
-              handleSeek(
-                (e.nativeEvent.offsetX / e.target.offsetWidth) * duration
-              )
-            }
+            onClick={(e) => handleSeek((e.nativeEvent.offsetX / e.target.offsetWidth) * duration)}
           >
-            <div
-              className="progress-filled"
-              style={{ width: `${progress}%` }}
-            ></div>
+            <div className="progress-filled" style={{ width: `${progress}%` }}></div>
           </div>
         </div>
         <div className="track-info">
@@ -140,8 +186,8 @@ const MusicPlayer = (props) => {
           <div className="duration">{formatTime(duration)}</div>
         </div>
         <div className="musicDetails">
-          <h3 className="title">{musicDB[currentSongIndex].title}</h3>
-          <p className="subTitle">{musicDB[currentSongIndex].artist}</p>
+          <h3 className="title">{currentSong.title}</h3>
+          <p className="subTitle">{currentSong.artist}</p>
         </div>
         <div className="musicControls">
           <button className="playButton clickable" onClick={playPrev}>

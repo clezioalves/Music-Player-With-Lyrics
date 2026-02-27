@@ -1,30 +1,66 @@
-export const musicDB = [
-  {
-    id: 6334,
+import lyricsData from "./lyricsData.json";
+
+const GOOGLE_DRIVE_FOLDER_ID = "1dTuzWuaoVrPAKVocEq5MrOgsTQvWNZme";
+const AUDIO_MIME_TYPE = "audio/mpeg";
+
+const metadataBySlug = {
+  "a-sombra-de-tuas-palavras": {
     title: "A sombra de Tuas Palavras",
     artist: "Filho Varão",
     album: "Coletânea Filho Varão",
-    src: "http://192.168.0.174/midia/musicas/a-sombra-de-tuas-palavras_20260224-220315_ea13b3.mp3",
-    src2: "https://www.nobadsong.com/wp-content/uploads/2023/08/The-Weeknd-Starboy.mp3",
-    art: "https://teste.png",
-    lyrics: [
-      { time: 18.8, text: "A sombra de Tuas Palavras" },
-      { time: 21.3, text: "Descansa a minh'alma" },
-      { time: 27.0, text: "No Rio de Tuas Promessas" },
-      { time: 30.0, text: "Libero a Fé" },
-      { time: 35.0, text: "Tu És Soberano nos céus" },
-      { time: 40.0, text: "E Poderoso na terra" },
-      { time: 44.0, text: "O Único Deus" },
-      { time: 46.0, text: "Em quem confia meu ser" },
-      { time: 53.0, text: "Em Ti espero Senhor" },
-      { time: 60.0, text: "Jamais serei confundido" },
-      { time: 61.0, text: "Pois Tua Palavra Destrói" },
-      { time: 62.0, text: "Todos os meus inimigos" },
-      { time: 63.0, text: "Destrói todos os meus inimigos" },
-      { time: 64.0, text: "Destrói todos os meus inimigos" },
-      { time: 65.0, text: "Destrói todos os meus inimigos" },
-      { time: 66.0, text: "A sombra de Tuas Palavras" },
-      { time: 78.0, text: "Descansa a minh'alma" }
-    ],
+    art: "https://teste.png"
   }
-];
+};
+
+const createSlug = (fileName) =>
+  fileName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+const buildStreamUrl = (fileId) =>
+  `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+export const loadMusicDB = async () => {
+  const apiKey = process.env.REACT_APP_GOOGLE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "Configure REACT_APP_GOOGLE_API_KEY para listar os áudios da pasta pública do Google Drive."
+    );
+  }
+
+  const query = encodeURIComponent(`'${GOOGLE_DRIVE_FOLDER_ID}' in parents and trashed = false`);
+  const fields = encodeURIComponent("files(id,name,mimeType)");
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&orderBy=name&key=${apiKey}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Não foi possível carregar os arquivos de áudio do Google Drive.");
+  }
+
+  const data = await response.json();
+
+  return (data.files || [])
+    .filter((file) => file.mimeType === AUDIO_MIME_TYPE)
+    .map((file, index) => {
+      const slug = createSlug(file.name);
+      const metadata = metadataBySlug[slug] || {};
+
+      return {
+        id: file.id,
+        title: metadata.title || file.name.replace(/\.[^/.]+$/, ""),
+        artist: metadata.artist || "Artista desconhecido",
+        album: metadata.album || "Google Drive",
+        src: buildStreamUrl(file.id),
+        art: metadata.art || "https://via.placeholder.com/300x300?text=Album+Art",
+        lyrics: lyricsData[slug] || [],
+        order: index
+      };
+    });
+};
