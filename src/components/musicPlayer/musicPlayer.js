@@ -80,11 +80,15 @@ const MusicPlayer = (props) => {
   useEffect(() => {
     if (!audioRef.current || !currentSong) return;
 
+    // use the srcAlt as-is (don't append arbitrary suffixes)
     const fallbackSrc = currentSong.srcAlt;
     audioRef.current.dataset.triedAlt = "false";
-    audioRef.current.onerror = () => {
+    audioRef.current.onerror = (e) => {
+      console.warn("audio onerror", e, "currentSrc:", audioRef.current && audioRef.current.currentSrc);
+      // try fallback once
       if (fallbackSrc && audioRef.current.dataset.triedAlt !== "true") {
         audioRef.current.dataset.triedAlt = "true";
+        console.log("Trying fallback audio src:", fallbackSrc);
         audioRef.current.src = fallbackSrc;
         audioRef.current.load();
         audioRef.current.play().catch(() => {});
@@ -136,20 +140,21 @@ const MusicPlayer = (props) => {
   };
 
   useEffect(() => {
+    // previously we used an interval that depended on `currentTime`
+    // to send updates to the lyrics component. that meant the effect
+    // was torn down and recreated on every tick, and in some cases
+    // the time seen by the lyrics lagged behind until pause.
+    //
+    // instead we now call `props.getDataForLyrics` directly inside
+    // handleTimeUpdate so the information is pushed synchronously
+    // with the audio element's `timeupdate` event. the effect is
+    // retained here only to clear any future side effects when the
+    // track changes, but it no longer watches currentTime.
     if (!currentSong) {
       return;
     }
-
-    const intervalId = setInterval(() => {
-      props.getDataForLyrics({
-        trackId: currentSong.id,
-        currentTime,
-        lyrics: currentSong.lyrics
-      });
-    }, 500);
-
-    return () => clearInterval(intervalId);
-  }, [currentSong, currentTime, props]);
+    return () => {};
+  }, [currentSong]);
 
   useEffect(() => {
     const audioElement = audioRef.current;
@@ -170,7 +175,15 @@ const MusicPlayer = (props) => {
   }, [playNext, songs.length]);
 
   const handleTimeUpdate = () => {
-    setCurrentTime(audioRef.current.currentTime);
+    const t = audioRef.current.currentTime;
+    setCurrentTime(t);
+    if (currentSong) {
+      props.getDataForLyrics({
+        trackId: currentSong.id,
+        currentTime: t,
+        lyrics: currentSong.lyrics,
+      });
+    }
   };
 
   const handleLoadedMetadata = () => {
